@@ -1,0 +1,30 @@
+# local data (readpaper export) and runtime state
+local_data/
+data/
+
+# python
+backend/.venv/
+__pycache__/
+*.pyc
+*.pyo
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+backend/dist/
+
+# env / local overrides
+.env
+.env.local
+
+# logs & temp files
+*.log
+*.tmp
+
+# editors / os
+.DS_Store
+.idea/
+.vscode/
+backup/
+
+# local tooling settings
+.claude/

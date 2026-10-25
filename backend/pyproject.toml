@@ -1,0 +1,34 @@
+[project]
+name = "paper-reader"
+version = "1.0.0"
+description = "Local, Docker-deployable paper library inspired by readpaper"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "python-multipart>=0.0.12",
+    "pydantic>=2.9",
+]
+
+[dependency-groups]
+dev = ["ruff>=0.6", "pytest>=8.0", "httpx>=0.27", "websockets>=12.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `app` sits next to the tests, it is not a package of its own.
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# B008: FastAPI relies on calls in default arguments (File/Form/Depends).
+ignore = ["B008"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

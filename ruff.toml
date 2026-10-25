@@ -1,0 +1,7 @@
+# The lint rules for the files outside backend/ (the browser tests).
+# The backend keeps its own rules in backend/pyproject.toml.
+line-length = 100
+target-version = "py310"
+
+[lint]
+ignore = ["B008"]

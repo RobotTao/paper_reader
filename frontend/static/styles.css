@@ -1,0 +1,2377 @@
+:root {
+  --bg: #ffffff;
+  --sidebar-bg: #f7f7f7;
+  --blue: #3b71ca;
+  --blue-soft: #eaf1fc;
+  --text: #333333;
+  --text-strong: #1f2328;
+  --muted: #666666;
+  --muted-light: #9aa0a6;
+  --border: #e5e5e5;
+  --border-soft: #f0f0f0;
+  /* The gutter between two columns: a 5px band that is a little denser in the
+     middle, so it reads as a soft line instead of a wall. */
+  --col-sep: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.025) 0%,
+    rgba(15, 23, 42, 0.075) 50%,
+    rgba(15, 23, 42, 0.025) 100%
+  );
+  --hover: #f6f8fb;
+  --star: #d8dde3;
+  --star-on: #f0ad4e;
+  --danger: #d9534f;
+  --radius: 8px;
+  --sidebar-width: 240px;
+  /* one tree level = 4 spaces of the 13px sidebar font */
+  --tree-indent: 15px;
+  --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: 14px;
+  color: inherit;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Drag handle on the right edge of the sidebar. Its exact position is
+   maintained by JS, because the sidebar width can be clamped to the
+   viewport. */
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--sidebar-width) - 3px);
+  width: 7px;
+  cursor: col-resize;
+  z-index: 20;
+  touch-action: none;
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:focus-visible {
+  background: var(--blue);
+  outline: none;
+}
+
+/* ------------------------------- sidebar -------------------------------- */
+
+.sidebar {
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.sidebar-header .left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sidebar-header .count {
+  color: var(--muted-light);
+  font-weight: 400;
+}
+
+.icon-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.icon-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--text-strong);
+}
+
+.sidebar-search {
+  padding: 0 12px 10px;
+}
+
+.sidebar-search input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 9px;
+  outline: none;
+}
+
+.sidebar-search input:focus {
+  border-color: var(--blue);
+}
+
+.sidebar-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+.folder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.folder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  user-select: none;
+}
+
+.folder-item:hover {
+  background: rgba(0, 0, 0, 0.045);
+}
+
+.folder-item.active {
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.folder-item .name {
+  flex: 1;
+  /* flex items default to min-width:auto, which would let a long title
+     push the row wider than the sidebar instead of being clipped. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-item .count {
+  color: var(--muted-light);
+  font-size: 12px;
+}
+
+.folder-item .chevron {
+  color: var(--muted-light);
+  transition: transform 0.15s ease;
+}
+
+.folder-item.collapsed .chevron {
+  transform: rotate(-90deg);
+}
+
+/* The chevron is also the expand/collapse button. */
+.folder-item .chevron-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.folder-item .chevron-toggle:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--text);
+}
+
+.folder-item .actions {
+  display: none;
+  gap: 2px;
+}
+
+.folder-item:hover .actions {
+  display: flex;
+}
+
+/* ------------------------------- drag & drop ---------------------------- */
+
+[draggable="true"] {
+  user-select: none;
+}
+
+.folder-item.dragging,
+.tree-paper.dragging,
+.unfiled-item.dragging {
+  opacity: 0.45;
+}
+
+.folder-item.drag-over {
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 1px var(--blue);
+}
+
+#unfiled-papers.drag-over {
+  background: var(--blue-soft);
+  border-radius: 8px;
+}
+
+.folder-item .actions .icon-btn {
+  padding: 2px;
+  color: var(--muted-light);
+}
+
+.folder-item .actions .icon-btn:hover {
+  color: #d64545;
+  background: rgba(214, 69, 69, 0.1);
+}
+
+/* A folder node wraps the row itself plus its sub-folders and papers. */
+.folder-node {
+  list-style: none;
+}
+
+/* -------------------------------- trash ---------------------------------- */
+
+.trash-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 8px 0;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+}
+
+.trash-link:hover {
+  background: rgba(0, 0, 0, 0.045);
+  color: var(--text);
+}
+
+.trash-link.active {
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.trash-link .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-link .count {
+  color: var(--muted-light);
+  font-size: 12px;
+}
+
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.trash-head {
+  padding: 10px 14px;
+  font-size: 12.5px;
+  color: var(--muted-light);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trash-hint {
+  color: var(--muted-light);
+  opacity: 0.8;
+}
+
+.trash-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.trash-item:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.trash-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.trash-info .title {
+  font-size: 13.5px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-info .meta {
+  font-size: 12px;
+  color: var(--muted-light);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trash-actions {
+  display: flex;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+/* ---------------------------- context menu ------------------------------ */
+
+.context-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 168px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.context-menu button:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.context-menu button.danger {
+  color: var(--danger);
+}
+
+.context-menu button.danger:hover {
+  background: rgba(214, 69, 69, 0.1);
+}
+
+.context-menu .sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 2px;
+}
+
+/* What the user loses when a folder is deleted. */
+.danger-note {
+  color: var(--danger);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.loss-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.loss-list li {
+  margin-bottom: 4px;
+}
+
+.loss-note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--muted-light);
+}
+
+/* The delete window: what to take out of the folders, what to throw away. */
+.delete-section {
+  margin-top: 12px;
+}
+
+.delete-section-title {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.delete-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.delete-option:hover {
+  background: var(--hover);
+}
+
+.delete-option input:disabled + span {
+  color: var(--muted-light);
+}
+
+/* One tree level = 4 spaces of the 13px sidebar font. */
+.folder-children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--tree-indent);
+}
+
+.folder-papers {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 calc(var(--tree-indent) + 23px);
+}
+
+.tree-paper {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.tree-paper:hover {
+  background: rgba(0, 0, 0, 0.045);
+  color: var(--text);
+}
+
+.tree-paper .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The trash button of a paper in the sidebar shows up on hover. */
+.tree-paper .paper-delete,
+.unfiled-item .paper-delete {
+  display: none;
+  flex: 0 0 auto;
+  padding: 2px;
+  color: var(--muted-light);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.tree-paper:hover .paper-delete,
+.unfiled-item:hover .paper-delete {
+  display: inline-flex;
+}
+
+.tree-paper .paper-delete:hover,
+.unfiled-item .paper-delete:hover {
+  color: #d64545;
+  background: rgba(214, 69, 69, 0.1);
+}
+
+.folder-papers-note {
+  list-style: none;
+  padding: 3px 8px 5px calc(var(--tree-indent) + 23px);
+  font-size: 11.5px;
+  color: var(--muted-light);
+}
+
+.separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 14px 8px;
+  color: var(--muted-light);
+  font-size: 11px;
+}
+
+.separator::before,
+.separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.unfiled-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.unfiled-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.unfiled-item:hover {
+  background: rgba(0, 0, 0, 0.045);
+  color: var(--text);
+}
+
+.unfiled-item .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------- main ---------------------------------- */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-box {
+  flex: 1;
+  max-width: 520px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box svg {
+  position: absolute;
+  left: 10px;
+  color: var(--muted-light);
+  pointer-events: none;
+}
+
+.search-box input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 7px 12px 7px 32px;
+  outline: none;
+  background: #fbfbfc;
+}
+
+.search-box input:focus {
+  border-color: var(--blue);
+  background: #fff;
+}
+
+.topbar .spacer {
+  flex: 1;
+}
+
+.btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.btn:hover {
+  border-color: #cfd6de;
+  background: #fafbfc;
+}
+
+.btn.primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.btn.primary:hover {
+  background: #3464b4;
+}
+
+.btn.ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn.danger {
+  color: var(--danger);
+  border-color: #f0d5d4;
+}
+
+.btn.small {
+  padding: 4px 9px;
+  font-size: 12.5px;
+}
+
+/* A button that is toggled on, like the reader's side panel. */
+.btn.on {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: #f2f6fd;
+}
+
+select.btn {
+  appearance: none;
+  padding-right: 26px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* ------------------------------- list ----------------------------------- */
+
+/* The columns can be dragged to a different width. The title column is the
+   flexible one: it takes whatever the other columns leave over. */
+.list-header,
+.paper-row {
+  display: grid;
+  grid-template-columns:
+    var(--w-title, minmax(240px, 1fr))
+    var(--w-tag, 190px)
+    var(--w-remark, 150px)
+    var(--w-stars, 120px)
+    var(--w-read, 64px);
+  /* The cells fill the whole height of the row, so that the line between two
+     columns runs from the top of the list to the bottom without a break. The
+     content inside a cell is centred by the cell itself. */
+  align-items: stretch;
+  gap: 10px;
+  padding: 0 18px;
+}
+
+.list-header {
+  height: 38px;
+  border-bottom: 1px solid var(--border);
+  /* The first row of the list - the names of the columns - is black and
+     bold, so the table reads from the top down. */
+  color: #000;
+  font-weight: 700;
+  font-size: 14.5px;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+
+.list-header .col {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+}
+
+.list-header .col:hover {
+  color: var(--blue);
+}
+
+/* The handle that drags the border between two columns. */
+.col-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -5px;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 3;
+}
+
+.col-resize::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+
+.col-resize:hover::after {
+  background: var(--blue);
+}
+
+/* The gutter between two columns. Every cell carries the same band, and the
+   cells fill the whole height of their row, so the bands of all rows join up
+   into one single line from the top of the list to the bottom. The band sits
+   in the gap between the two columns and never covers any text. */
+.list-header .col:not(:last-child)::before,
+.paper-row > *:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  right: -6.5px;
+  width: 3px;
+  background: var(--col-sep);
+  pointer-events: none;
+}
+
+/* The cells need a position for the band above to sit against. */
+.paper-row > * {
+  position: relative;
+}
+
+.paper-row {
+  min-height: 52px;
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+}
+
+.paper-row:hover {
+  background: var(--hover);
+}
+
+.paper-row .title {
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.paper-row .meta {
+  font-size: 12px;
+  color: var(--muted-light);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paper-title-cell {
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* The menu of the title opens on a right click; the button is only there so
+   that the menu can also be found without a right click. */
+.title-menu-btn {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  border: none;
+  background: #fff;
+  color: var(--muted-light);
+  cursor: pointer;
+  padding: 1px;
+  border-radius: 4px;
+  line-height: 0;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.paper-row:hover .title-menu-btn,
+.title-menu-btn:focus-visible {
+  opacity: 1;
+}
+
+.title-menu-btn:hover {
+  color: var(--blue);
+  background: var(--hover);
+}
+
+.tag-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* All the tags are shown. When there are too many for one line they wrap and
+   the row grows taller. */
+.tag-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.pill {
+  background: #f1f2f4;
+  border-radius: 10px;
+  padding: 1px 8px;
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  /* A very long tag name is cut off instead of pushing the column wider. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pill.blue {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+/* The "+" that opens the tag picker of this paper. It sits behind the last
+   tag, so it wraps along with the tags. */
+.tag-add {
+  border: none;
+  background: transparent;
+  color: var(--muted-light);
+  cursor: pointer;
+  padding: 1px 4px;
+  line-height: 0;
+  border-radius: 8px;
+  flex: none;
+  align-self: center;
+}
+
+.tag-add:hover {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.remark-cell {
+  font-size: 13px;
+  color: var(--muted);
+  cursor: text;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* The remark is cut off with a dot when it does not fit. */
+.remark-cell .remark-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The hint that a remark can be written here only shows up when the row
+   is looked at, so the list stays quiet. */
+.remark-cell .placeholder {
+  color: var(--muted-light);
+  opacity: 0;
+}
+
+.paper-row:hover .remark-cell .placeholder {
+  opacity: 1;
+}
+
+.remark-input {
+  width: 100%;
+  border: 1px solid var(--blue);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: #fff;
+}
+
+/* The tags of one paper in the tag picker. */
+.tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.tag-option:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.tag-option.on {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+/* The existing tags the picker offers: the best matches of what was
+   typed, at most 20 of them. */
+.tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.tag-suggestion {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  line-height: 1.3;
+}
+
+.tag-suggestion:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.tag-suggestions-empty {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.read-cell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* The stars sit in the middle of their cell. */
+.paper-row > [data-role="stars-cell"] {
+  display: flex;
+  align-items: center;
+}
+
+.read-toggle {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  border-radius: 11px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.12s ease;
+}
+
+.read-toggle:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.read-toggle.on {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.read-toggle.on:hover {
+  opacity: 0.85;
+}
+
+.stars {
+  display: flex;
+  gap: 2px;
+  color: var(--star);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.stars .on {
+  color: var(--star-on);
+}
+
+.empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--muted-light);
+}
+
+/* ---------------------------- pagination -------------------------------- */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+  color: var(--muted);
+  font-size: 12.5px;
+  flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+}
+
+.pagination .page-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination .page-size select {
+  padding: 3px 22px 3px 8px;
+  font-size: 12.5px;
+  background-position: right 6px center;
+}
+
+.pagination .page-info {
+  flex: 1;
+  text-align: center;
+}
+
+.pagination .pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination .btn.small {
+  min-width: 28px;
+  text-align: center;
+  padding: 4px 7px;
+}
+
+.pagination .btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pagination .btn.primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.page-gap {
+  color: var(--muted-light);
+  padding: 0 2px;
+}
+
+/* ------------------------------ reader ---------------------------------- */
+
+body.reader-page {
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.reader-standalone {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.reader {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* The side panel is hidden by default; the menu opens it. */
+.reader.side-open {
+  grid-template-columns: 1fr 360px;
+}
+
+/* The catalog on the left: it takes the room of the PDF when it is open. */
+.reader.left-open {
+  grid-template-columns: 280px 1fr;
+}
+
+.reader.left-open.side-open {
+  grid-template-columns: 280px 1fr 360px;
+}
+
+.reader-left {
+  display: none;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: #fcfcfd;
+  overflow: hidden;
+}
+
+.reader.left-open .reader-left {
+  display: flex;
+}
+
+.reader-left-tabs {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--muted-light);
+}
+
+.reader-left-tabs .active {
+  font-weight: 600;
+  color: var(--blue);
+}
+
+.reader-left-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.outline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.outline-list .outline-list {
+  padding-left: 14px;
+}
+
+.outline-item {
+  display: block;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #3c4043;
+  text-decoration: none;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.outline-item:hover {
+  background: #eef3fb;
+  color: var(--blue);
+}
+
+.outline-empty {
+  padding: 16px 14px;
+  font-size: 12.5px;
+  color: var(--muted-light);
+}
+
+.reader-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* The download button in the corner of the PDF. */
+.reader-download-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #f2f4f7;
+  background: rgba(30, 34, 40, 0.55);
+  opacity: 0.55;
+  transition: opacity 0.15s ease;
+}
+
+/* The handle of the side panel: a small flat button on the right edge,
+   half way down. It opens the panel and then rides on the divider. */
+.reader-side-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #f2f4f7;
+  background: rgba(30, 34, 40, 0.55);
+  opacity: 0.55;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease, right 0.15s ease;
+}
+
+/* With the panel open the handle sits on the divider: half of it on the
+   PDF, half of it on the panel. */
+.reader.side-open .reader-side-btn {
+  right: 360px;
+  transform: translate(50%, -50%);
+}
+
+/* The catalog has a handle of its own, on the left edge. */
+.reader-left-btn {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  color: #f2f4f7;
+  background: rgba(30, 34, 40, 0.55);
+  opacity: 0.55;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease, left 0.15s ease;
+}
+
+/* With the catalog open the handle sits on the divider. */
+.reader.left-open .reader-left-btn {
+  left: 280px;
+  transform: translate(-50%, -50%);
+}
+
+.reader-download-btn:hover,
+.reader-left-btn:hover,
+.reader-left-btn.on,
+.reader-side-btn:hover,
+.reader-side-btn.on {
+  opacity: 1;
+}
+
+.pdf-frame {
+  flex: 1;
+  border: none;
+  width: 100%;
+  background: #525659;
+}
+
+.pdf-container {
+  /* Positioned, so the pages measure their offset from the top of the
+     scrolled content: that is what the page counter and the "go to page"
+     scroll need. */
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background: #525659;
+  padding: 16px 0 24px;
+}
+
+/* The page counter floats over the PDF: it is only read, never typed
+   into, and it does not get in the way of the mouse. */
+.pdf-page-badge {
+  display: none;
+}
+
+/* The bar at the bottom of the PDF: where to go, how big, what to do.
+   It is white, like the one in readpaper, and it fades out of the way
+   until the mouse comes near. */
+.pdf-toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16);
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+  user-select: none;
+}
+
+.pdf-toolbar:hover {
+  opacity: 1;
+}
+
+.pdf-toolbar .icon-btn {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #3c4043;
+  border-radius: 6px;
+}
+
+.pdf-toolbar .icon-btn:hover {
+  background: #f0f2f5;
+}
+
+.pdf-toolbar .icon-btn.on {
+  background: #e6f0ff;
+  color: var(--blue);
+}
+
+.pdf-toolbar .btn {
+  padding: 3px 8px;
+  font-size: 12px;
+  color: #3c4043;
+  border-color: transparent;
+  background: transparent;
+}
+
+.pdf-toolbar .btn:hover {
+  background: #f0f2f5;
+}
+
+.pdf-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: #e3e5e8;
+}
+
+/* The page number: it can be typed into, to jump to that page. */
+.pdf-page-jump {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12.5px;
+  color: #3c4043;
+}
+
+.pdf-page-jump input {
+  width: 3.2ch;
+  padding: 2px 3px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  outline: none;
+  text-align: right;
+  font: inherit;
+  color: inherit;
+}
+
+.pdf-page-jump input:hover {
+  border-color: #d9d9d9;
+}
+
+.pdf-page-jump input:focus {
+  border-color: var(--blue);
+  background: #fff;
+}
+
+.pdf-page-total {
+  color: #8a8f96;
+}
+
+.pdf-zoom-level {
+  min-width: 4ch;
+  text-align: center;
+  font-size: 12px;
+  color: #3c4043;
+}
+
+/* The search box: it hangs above the bar at the bottom, so it does not
+   cover the place the reader jumped to. */
+.pdf-find-bar {
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  z-index: 60;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.16);
+}
+
+.pdf-find-bar[hidden] {
+  display: none;
+}
+
+.pdf-find-bar input {
+  width: 220px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+}
+
+.pdf-find-count {
+  min-width: 5ch;
+  text-align: center;
+  font-size: 12px;
+  color: #8a8f96;
+}
+
+.pdf-find-bar .icon-btn {
+  width: 24px;
+  height: 24px;
+  justify-content: center;
+  font-size: 13px;
+  color: #3c4043;
+  border-radius: 6px;
+}
+
+.pdf-find-bar .icon-btn:hover {
+  background: #f0f2f5;
+}
+
+/* Where the search found something. */
+.pdf-find-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The hits of the search. One group per hit: the group carries the
+   transparency, so the rectangles of a hit that runs over several lines
+   stay one colour instead of piling up into a darker patch. */
+.pdf-find-group {
+  position: absolute;
+  inset: 0;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+}
+
+.pdf-find-group.current {
+  opacity: 0.7;
+}
+
+.pdf-find {
+  position: absolute;
+  background: #ffd640;
+  border-radius: 2px;
+}
+
+.pdf-find.current {
+  background: #ff8c19;
+}
+
+/* The highlights of one annotation are drawn in one group as well. The
+   rectangles of a long selection cover each other - one line of text
+   reaches into the line above it - and a group keeps the colour of the
+   whole highlight the same everywhere. */
+.pdf-highlight-group {
+  position: absolute;
+  inset: 0;
+  opacity: 0.3;
+  mix-blend-mode: multiply;
+}
+
+.pdf-highlight {
+  position: absolute;
+  background: #ffff00;
+  border-radius: 2px;
+}
+
+/* The colours are the ones readpaper uses: blue for what is quoted, green
+   for what holds, yellow for what matters, orange for what is added, red
+   for what is doubted. */
+.pdf-highlight.green {
+  background: #80e639;
+}
+
+.pdf-highlight.orange {
+  background: #ff8c19;
+}
+
+.pdf-highlight.red {
+  background: #f24030;
+}
+
+.pdf-highlight.blue {
+  background: #338aff;
+}
+
+/* A frame drawn around a figure: a border, not a patch of colour. */
+.pdf-highlight.area {
+  background: transparent;
+  border: 2px solid rgba(214, 158, 22, 0.9);
+  border-radius: 3px;
+  mix-blend-mode: normal;
+}
+
+.pdf-highlight.area.green {
+  border-color: rgba(45, 152, 80, 0.9);
+}
+
+.pdf-highlight.area.orange {
+  border-color: rgba(200, 100, 10, 0.9);
+}
+
+.pdf-highlight.area.red {
+  border-color: rgba(200, 60, 60, 0.9);
+}
+
+.pdf-highlight.area.blue {
+  border-color: rgba(45, 110, 200, 0.9);
+}
+
+/* The text of the page: invisible, but selectable - that is what makes
+   highlighting a sentence possible. */
+.textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  overflow: clip;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+}
+
+.textLayer :is(span, br) {
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  color: transparent;
+  transform-origin: 0% 0%;
+}
+
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+
+.textLayer ::selection {
+  background: rgba(59, 130, 246, 0.35);
+}
+
+/* While a frame is being drawn, no text is picked up by accident. */
+.reader.area-mode .pdf-container {
+  cursor: crosshair;
+  user-select: none;
+}
+
+/* The frame that is being drawn right now. */
+.pdf-area-preview {
+  position: absolute;
+  z-index: 3;
+  border: 2px dashed rgba(255, 214, 64, 0.95);
+  background: rgba(255, 214, 64, 0.12);
+  pointer-events: none;
+}
+
+/* The bar that hangs under the selection: a small dark strip with the
+   colours and the button for a thought of one's own. It looks like the one
+   in readpaper. */
+.pdf-sel-bar,
+.pdf-sel-idea {
+  position: absolute;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border: none;
+  border-radius: 4px;
+  background: #393c3e;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+}
+
+.pdf-sel-bar[hidden],
+.pdf-sel-idea[hidden] {
+  display: none;
+}
+
+.pdf-sel-idea {
+  padding: 6px 8px;
+}
+
+.pdf-sel-idea input {
+  width: 190px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: #f2f4f7;
+  font-size: 12.5px;
+}
+
+.pdf-sel-idea input::placeholder {
+  color: rgba(242, 244, 247, 0.55);
+}
+
+/* The buttons in the bar follow the bar: light text on a dark ground. */
+.pdf-sel-bar .btn,
+.pdf-sel-idea .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  background: transparent;
+  color: #f2f4f7;
+  font-size: 12px;
+}
+
+.pdf-sel-bar .btn:hover,
+.pdf-sel-idea .btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sel-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* The colours are little dots, the way readpaper shows them. */
+.sel-dot,
+.sel-pick {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  background: var(--dot, #999);
+}
+
+.sel-dot:hover {
+  transform: scale(1.25);
+}
+
+.sel-pick.on {
+  border-color: #fff;
+}
+
+/* The popup on a highlight that is already there: a dashed frame around
+   the text, a small × on its top-right corner to delete it, and on its
+   bottom-right corner the colours and the button for a thought. */
+.annot-popup {
+  position: absolute;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.annot-popup[hidden] {
+  display: none;
+}
+
+.annot-popup-frame {
+  position: absolute;
+  inset: 0;
+  /* The frame has the colour of the highlight it belongs to. */
+  border: 2px dashed var(--annot-color, #3c78d8);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.annot-popup-x {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #5f6368;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: auto;
+}
+
+.annot-popup-x:hover {
+  color: #c5221f;
+  background: #fdecea;
+}
+
+.annot-popup-tools {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #393c3e;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+  pointer-events: auto;
+}
+
+/* The box for the thought: it sits above the frame, as long as the frame
+   itself, so it does not cover the words that are highlighted. */
+.annot-popup-note {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  background: #393c3e;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+  pointer-events: auto;
+}
+
+.annot-popup-tools[hidden],
+.annot-popup-note[hidden] {
+  display: none;
+}
+
+/* A highlight near the top of the window has no room above it: the box for
+   the thought hangs below the frame instead. */
+.annot-popup-note.below {
+  bottom: auto;
+  top: 100%;
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+/* Then the row of colours moves out of the way of the thought. */
+.annot-popup.note-below .annot-popup-tools {
+  top: calc(100% + var(--note-h, 0px) + 18px);
+}
+
+.annot-popup-tools .icon-btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: #f2f4f7;
+}
+
+.annot-popup-tools .icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.annot-popup-note textarea {
+  width: 100%;
+  padding: 0;
+  border: none;
+  outline: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  resize: none;
+  background: transparent;
+  color: #f2f4f7;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.5;
+  /* A long thought grows the box downwards, but the box hangs above the
+     highlight - so it must not climb out of the window. */
+  max-height: var(--note-max, none);
+}
+
+.annot-popup-note textarea::placeholder {
+  color: rgba(242, 244, 247, 0.55);
+}
+
+/* While a colour is hovered the text under the mouse takes that colour,
+   so one can see what it will look like before choosing it. */
+.pdf-container.preview-blue .textLayer ::selection {
+  background: rgba(51, 138, 255, 0.35);
+}
+
+.pdf-container.preview-green .textLayer ::selection {
+  background: rgba(128, 230, 57, 0.35);
+}
+
+.pdf-container.preview-yellow .textLayer ::selection {
+  background: rgba(255, 255, 0, 0.35);
+}
+
+.pdf-container.preview-orange .textLayer ::selection {
+  background: rgba(255, 140, 25, 0.35);
+}
+
+.pdf-container.preview-red .textLayer ::selection {
+  background: rgba(242, 64, 48, 0.35);
+}
+
+.pdf-page {
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+
+.pdf-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.annotation[data-annot-page] {
+  cursor: pointer;
+}
+
+.annotation[data-annot-page]:hover {
+  background: #f4f7fc;
+}
+
+.reader-side {
+  display: none;
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 16px;
+  background: #fcfcfd;
+}
+
+.reader.side-open .reader-side {
+  display: block;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted-light);
+  margin-bottom: 5px;
+}
+
+.field .hint {
+  font-size: 12px;
+  color: var(--muted-light);
+  margin-top: 5px;
+}
+
+.field input[type="text"],
+.field input[type="number"],
+.field textarea,
+.field select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+  outline: none;
+  background: #fff;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus {
+  border-color: var(--blue);
+}
+
+.field textarea {
+  min-height: 90px;
+  line-height: 1.6;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #eef1f5;
+  border-radius: 12px;
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--muted);
+  max-width: 100%;
+}
+
+/* A full folder path can be long: cut it off, the title has the whole thing. */
+.chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.chip button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted-light);
+  padding: 0;
+  line-height: 1;
+  font-size: 13px;
+}
+
+.chip button:hover {
+  color: var(--danger);
+}
+
+.annotation {
+  border-left: 2px solid var(--border);
+  padding: 6px 0 6px 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* The colour of the highlight, as a dot. */
+.annotation.yellow {
+  border-left-color: #d69e16;
+}
+
+.annotation.green {
+  border-left-color: #2d9850;
+}
+
+.annotation.red {
+  border-left-color: #c83c3c;
+}
+
+.annotation.blue {
+  border-left-color: #2d6ec8;
+}
+
+.annotation.orange {
+  border-left-color: #d97706;
+}
+
+.annot-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.annot-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.annot-dot.yellow {
+  background: #d69e16;
+}
+
+.annot-dot.green {
+  background: #2d9850;
+}
+
+.annot-dot.red {
+  background: #c83c3c;
+}
+
+.annot-dot.blue {
+  background: #2d6ec8;
+}
+
+.annot-dot.orange {
+  background: #d97706;
+}
+
+.annot-kind {
+  font-size: 11px;
+  color: var(--muted-light);
+}
+
+.annot-del {
+  margin-left: auto;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted-light);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.annot-del:hover {
+  color: #c83c3c;
+}
+
+.annot-text {
+  color: var(--text);
+  word-break: break-word;
+}
+
+.annot-idea {
+  width: 100%;
+  margin-top: 5px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #fff8e6;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.annot-idea:focus {
+  outline: none;
+  border-color: var(--blue);
+}
+
+.annotation .page {
+  color: var(--blue);
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.annotation .idea {
+  margin-top: 5px;
+  color: var(--text);
+  background: #fff8e6;
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
+.section-title {
+  font-size: 12px;
+  color: var(--muted-light);
+  margin: 20px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ------------------------------ modal ----------------------------------- */
+
+.modal-root:empty {
+  display: none;
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 28, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 480px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+}
+
+/* The folder picker lists every category, so it gets twice the width. */
+.modal.wide {
+  width: 960px;
+}
+
+.modal header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.modal .body {
+  padding: 16px 18px;
+}
+
+/* The text of a yes / no dialog. */
+.modal .body .confirm-text {
+  margin: 0;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.modal footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+}
+
+.drop-zone {
+  border: 1px dashed #c9ced6;
+  border-radius: 8px;
+  padding: 22px;
+  text-align: center;
+  color: var(--muted-light);
+  cursor: pointer;
+  margin-bottom: 14px;
+}
+
+.drop-zone.drag {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.file-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.tabs button {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.tabs button.active {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-soft);
+  font-weight: 600;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(31, 35, 40, 0.92);
+  color: #fff;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease;
+  z-index: 80;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.picker {
+  max-height: 60vh;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px;
+}
+
+.picker label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.picker label:hover {
+  background: var(--hover);
+}
+
+/* The parent of a folder whose name repeats under several parents. */
+.picker-parent {
+  color: var(--muted-light);
+  font-size: 12px;
+}
+
+.picker-tree,
+.picker-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.picker-row:hover {
+  background: var(--hover);
+}
+
+.picker-caret {
+  display: inline-flex;
+  align-items: center;
+  width: 12px;
+  flex: none;
+  color: var(--muted-light);
+  cursor: pointer;
+}
+
+.picker-caret.blank {
+  cursor: default;
+}
+
+.picker-caret svg {
+  transition: transform 0.15s ease;
+}
+
+.picker-caret.collapsed svg {
+  transform: rotate(-90deg);
+}
+
+.picker-name[data-toggle] {
+  cursor: pointer;
+}
+
+.picker-children.collapsed {
+  display: none;
+}
+
+.spacer-lg {
+  height: 10px;
+}
+
+@media (max-width: 900px) {
+  .list-header,
+  .paper-row {
+    grid-template-columns: minmax(160px, 1fr) 120px 110px 64px;
+  }
+
+  /* The columns have a fixed width here, so there is nothing to drag. */
+  .col-resize {
+    display: none;
+  }
+  .list-header .col.hide-sm,
+  .paper-row .remark-cell {
+    display: none;
+  }
+  .reader {
+    grid-template-columns: 1fr;
+  }
+  .reader.side-open {
+    grid-template-columns: 1fr;
+  }
+  /* Too narrow for two columns: the panel floats over the PDF instead of
+     squeezing it. */
+  .reader.side-open .reader-side {
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(360px, 88vw);
+    box-shadow: -6px 0 18px rgba(15, 23, 42, 0.18);
+    z-index: 40;
+  }
+  /* The panel is a drawer here, so the handle rides on its left edge. */
+  .reader.side-open .reader-side-btn {
+    right: min(360px, 88vw);
+    transform: translate(50%, -50%);
+  }
+}
